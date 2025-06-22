@@ -18,9 +18,8 @@ from app.core.monitoring import setup_monitoring
 setup_logging()
 logger = structlog.get_logger()
 
-# Set offline mode for development
-settings.offline_mode = True
-logger.info("Running in offline mode - external services disabled")
+# Online mode - all services enabled
+logger.info("Running in online mode - all services enabled")
 
 from app.api.v1.api import api_router
 

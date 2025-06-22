@@ -5,7 +5,7 @@ from langchain.llms import Ollama
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage, BaseMessage
-from pydantic import SecretStr
+from pydantic.v1 import SecretStr
 from app.core.config import settings
 
 logger = structlog.get_logger()
@@ -24,7 +24,7 @@ class LLMService:
         if settings.gemini_api_key:
             logger.info("Initializing Gemini LLM", model=settings.llm_model)
             return ChatGoogleGenerativeAI(
-                google_api_key=SecretStr(settings.gemini_api_key),
+                api_key=SecretStr(settings.gemini_api_key),
                 model=settings.llm_model,
                 temperature=0.1,
                 convert_system_message_to_human=True
@@ -66,15 +66,6 @@ Please answer the question based on the context provided above."""
                     HumanMessage(content=user_prompt)
                 ]
                 response = await self.llm.agenerate([gemini_messages])
-                answer = response.generations[0][0].text
-                
-            elif isinstance(self.llm, ChatOpenAI):
-                # For OpenAI
-                openai_messages: List[BaseMessage] = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_prompt)
-                ]
-                response = await self.llm.agenerate([openai_messages])
                 answer = response.generations[0][0].text
                 
             else:
@@ -120,8 +111,6 @@ Please answer the question based on the context provided above."""
         """Get the current LLM provider name"""
         if isinstance(self.llm, ChatGoogleGenerativeAI):
             return "gemini"
-        elif isinstance(self.llm, ChatOpenAI):
-            return "openai"
         else:
             return "ollama"
     
@@ -153,14 +142,6 @@ Please answer the question based on the context provided above."""
                     'model': settings.llm_model,
                     'type': 'chat',
                     'api_key_configured': bool(settings.gemini_api_key)
-                }
-                
-            elif isinstance(self.llm, ChatOpenAI):
-                return {
-                    'provider': 'openai',
-                    'model': 'gpt-3.5-turbo',
-                    'type': 'chat',
-                    'api_key_configured': bool(settings.openai_api_key)
                 }
                 
             else:

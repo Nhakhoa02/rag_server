@@ -4,7 +4,7 @@ import os
 
 class Settings(BaseSettings):
     # Database settings
-    mongodb_uri: str = "mongodb://admin:password123@localhost:27017/rag_db?authSource=admin"
+    mongodb_uri: str = "mongodb://admin:password123@localhost:27018/rag_db?authSource=admin"
     redis_url: str = "redis://localhost:6379/0"
     
     # Vector database settings
