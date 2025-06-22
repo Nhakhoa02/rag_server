@@ -18,8 +18,11 @@ from app.core.monitoring import setup_monitoring
 setup_logging()
 logger = structlog.get_logger()
 
-# Online mode - all services enabled
-logger.info("Running in online mode - all services enabled")
+# Log the current mode
+if settings.offline_mode:
+    logger.info("Running in offline mode - limited functionality")
+else:
+    logger.info("Running in online mode - all services enabled")
 
 from app.api.v1.api import api_router
 
@@ -68,7 +71,8 @@ async def root():
     return {
         "message": "RAG Server is running",
         "version": "1.0.0",
-        "status": "healthy"
+        "status": "healthy",
+        "mode": "offline" if settings.offline_mode else "online"
     }
 
 @app.get("/health")
@@ -78,6 +82,7 @@ async def health_check():
         # Add basic health checks here
         return {
             "status": "healthy",
+            "mode": "offline" if settings.offline_mode else "online",
             "timestamp": structlog.stdlib.get_logger().handlers[0].formatter.formatTime(
                 structlog.stdlib.get_logger().handlers[0].formatter, 
                 structlog.stdlib.get_logger().handlers[0].formatter.converter()

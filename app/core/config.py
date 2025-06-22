@@ -12,11 +12,9 @@ class Settings(BaseSettings):
     qdrant_collection_name: str = "rag_documents"
     
     # LLM settings
-    openai_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
-    ollama_base_url: str = "http://localhost:11434"
     llm_model: str = "gemini-pro"  # Default to Gemini
-    llm_provider: str = "gemini"   # gemini, openai, or ollama
+    llm_provider: str = "gemini"   # gemini only
     
     # File processing settings
     max_file_size: int = 50 * 1024 * 1024  # 50MB
@@ -74,10 +72,6 @@ if qdrant_collection_env:
 gemini_key_env = os.getenv("GEMINI_API_KEY")
 if gemini_key_env:
     settings.gemini_api_key = gemini_key_env
-
-ollama_url_env = os.getenv("OLLAMA_BASE_URL")
-if ollama_url_env:
-    settings.ollama_base_url = ollama_url_env
 
 llm_provider_env = os.getenv("LLM_PROVIDER")
 if llm_provider_env:

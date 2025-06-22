@@ -1,31 +1,30 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
 python-multipart==0.0.6
-pymongo==4.6.0
+aiofiles==23.2.1
+structlog==23.2.0
+prometheus-client==0.19.0
+httpx==0.25.2
+
+# Database
 motor==3.3.2
+redis==5.0.1
+
+# Vector database
 qdrant-client==1.7.0
-sentence-transformers==2.2.2
-langchain==0.1.0
-langchain-community==0.0.2
-langchain-openai==0.0.2
-langchain-google-genai==0.0.5
-google-generativeai==0.3.2
+
+# Document processing
 pypdf2==3.0.1
 python-docx==1.1.0
 openpyxl==3.1.2
-pandas==2.1.3
+pandas==2.1.4
 pillow==10.1.0
 pytesseract==0.3.10
-opencv-python==4.8.1.78
-numpy==1.25.2
-python-dotenv==1.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-httpx==0.25.2
-aiofiles==23.2.1
-redis==5.0.1
-celery==5.3.4
-prometheus-client==0.19.0
-structlog==23.2.0
-tenacity==8.2.3
-huggingface-hub==0.19.4 
+
+# Embeddings and LLM
+sentence-transformers==2.2.2
+langchain==0.1.0
+langchain-google-genai==0.0.6
+langchain-core==0.1.10 

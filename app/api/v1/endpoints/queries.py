@@ -75,20 +75,23 @@ async def ask_question(request: QueryRequest):
             }
         )
         
-        # Save query to MongoDB
-        mongodb = get_mongodb()
-        query_record = {
-            'query_id': query_id,
-            'query': request.query,
-            'answer': answer,
-            'sources_count': len(sources),
-            'user_id': request.user_id,
-            'timestamp': datetime.utcnow(),
-            'filter_metadata': request.filter_metadata,
-            'search_mode': request.search_mode
-        }
-        
-        await mongodb.rag_db.queries.insert_one(query_record)
+        # Save query to MongoDB (if available)
+        try:
+            mongodb = get_mongodb()
+            query_record = {
+                'query_id': query_id,
+                'query': request.query,
+                'answer': answer,
+                'sources_count': len(sources),
+                'user_id': request.user_id,
+                'timestamp': datetime.utcnow(),
+                'filter_metadata': request.filter_metadata,
+                'search_mode': request.search_mode
+            }
+            
+            await mongodb.rag_db.queries.insert_one(query_record)
+        except Exception as e:
+            logger.warning("MongoDB not available, skipping query storage", error=str(e))
         
         logger.info("Query processed successfully", 
                    query_id=query_id,
@@ -137,8 +140,13 @@ async def list_queries(
         }
         
     except Exception as e:
-        logger.error("Failed to list queries", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to list queries")
+        logger.warning("MongoDB not available, returning empty query list", error=str(e))
+        return {
+            "queries": [],
+            "total": 0,
+            "limit": limit,
+            "skip": skip
+        }
 
 @router.get("/{query_id}")
 async def get_query(query_id: str):
@@ -155,8 +163,8 @@ async def get_query(query_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get query", query_id=query_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to get query")
+        logger.warning("MongoDB not available, query not found", error=str(e))
+        raise HTTPException(status_code=404, detail="Query not found")
 
 @router.get("/stats/summary")
 async def get_query_stats():
@@ -186,5 +194,9 @@ async def get_query_stats():
         }
         
     except Exception as e:
-        logger.error("Failed to get query stats", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to get query stats") 
+        logger.warning("MongoDB not available, returning empty stats", error=str(e))
+        return {
+            "total_queries": 0,
+            "today_queries": 0,
+            "user_stats": []
+        } 

@@ -24,10 +24,14 @@ async def init_db():
         await mongodb_client.admin.command('ping')
         logger.info("MongoDB connection established")
         
-        # Initialize Redis
-        redis_client = redis.from_url(settings.redis_url)
-        await redis_client.ping()
-        logger.info("Redis connection established")
+        # Initialize Redis with better error handling
+        try:
+            redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+            await redis_client.ping()
+            logger.info("Redis connection established")
+        except Exception as redis_error:
+            logger.warning("Redis connection failed, continuing without Redis", error=str(redis_error))
+            redis_client = None
         
     except Exception as e:
         logger.error("Database initialization failed", error=str(e))
@@ -72,9 +76,9 @@ async def health_check():
         mongodb = get_mongodb()
         await mongodb.admin.command('ping')
         
-        # Check Redis
-        redis_client = get_redis()
-        await redis_client.ping()
+        # Check Redis (if available)
+        if redis_client:
+            await redis_client.ping()
         
         return True
     except Exception as e:

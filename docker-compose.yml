@@ -27,6 +27,7 @@ services:
       - redis_data:/data
     networks:
       - rag_network
+    command: redis-server --appendonly yes
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -55,8 +56,7 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_COLLECTION_NAME=rag_documents
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_PROVIDER=gemini
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
@@ -72,24 +72,10 @@ services:
       timeout: 10s
       retries: 3
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: rag_ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - rag_network
-    profiles:
-      - ollama
-
 volumes:
   mongodb_data:
   redis_data:
   qdrant_data:
-  ollama_data:
 
 networks:
   rag_network:

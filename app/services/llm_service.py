@@ -1,48 +1,49 @@
 import httpx
 import structlog
 from typing import List, Dict, Any, Optional
-from langchain.llms import Ollama
-from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
 from pydantic.v1 import SecretStr
 from app.core.config import settings
 
 logger = structlog.get_logger()
 
 class LLMService:
-    """LLM service supporting multiple providers (Gemini, OpenAI, Ollama)"""
+    """LLM service supporting Gemini only"""
     
     def __init__(self):
-        self.llm = self._initialize_llm()
+        self.llm = None
+        self.llm_provider = None
+        self._initialize_llm()
     
     def _initialize_llm(self):
         """Initialize LLM based on configuration and available API keys"""
-        # Priority order: Gemini > OpenAI > Ollama
-        
-        # Try Gemini first
-        if settings.gemini_api_key:
-            logger.info("Initializing Gemini LLM", model=settings.llm_model)
-            return ChatGoogleGenerativeAI(
-                api_key=SecretStr(settings.gemini_api_key),
-                model=settings.llm_model,
-                temperature=0.1,
-                convert_system_message_to_human=True
-            )
-        
-        
-        # Fallback to Ollama
-        else:
-            logger.info("Initializing Ollama LLM", model=settings.llm_model)
-            return Ollama(
-                base_url=settings.ollama_base_url,
-                model=settings.llm_model,
-                temperature=0.1
-            )
+        try:
+            # Check for Gemini API key
+            if settings.gemini_api_key:
+                logger.info("Initializing Gemini LLM", model=settings.llm_model)
+                self.llm = ChatGoogleGenerativeAI(
+                    api_key=SecretStr(settings.gemini_api_key),
+                    model=settings.llm_model,
+                    temperature=0.1,
+                    convert_system_message_to_human=True
+                )
+                self.llm_provider = "gemini"
+            else:
+                logger.warning("No Gemini API key available - LLM functionality disabled")
+                self.llm_provider = "none"
+                
+        except Exception as e:
+            logger.error("Failed to initialize LLM", error=str(e))
+            self.llm = None
+            self.llm_provider = "none"
     
     async def generate_response(self, query: str, context: List[Dict[str, Any]]) -> str:
         """Generate response using RAG"""
         try:
+            if not self.llm:
+                return "LLM service is not available. Please configure a Gemini API key."
+            
             # Prepare context
             context_text = self._prepare_context(context)
             
@@ -58,27 +59,19 @@ Question: {query}
 
 Please answer the question based on the context provided above."""
             
-            # Generate response based on LLM type
-            if isinstance(self.llm, ChatGoogleGenerativeAI):
-                # For Gemini
-                gemini_messages: List[BaseMessage] = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_prompt)
-                ]
-                response = await self.llm.agenerate([gemini_messages])
-                answer = response.generations[0][0].text
-                
-            else:
-                # For Ollama
-                full_prompt = f"{system_prompt}\n\n{user_prompt}"
-                response = await self.llm.agenerate([full_prompt])
-                answer = response.generations[0][0].text
+            # Generate response
+            messages: List[BaseMessage] = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt)
+            ]
+            response = await self.llm.agenerate([messages])
+            answer = response.generations[0][0].text
             
             logger.info("LLM response generated", 
                        query_length=len(query),
                        context_chunks=len(context),
                        response_length=len(answer),
-                       llm_provider=self._get_provider_name())
+                       llm_provider=self.llm_provider)
             
             return answer.strip()
             
@@ -86,7 +79,7 @@ Please answer the question based on the context provided above."""
             logger.error("Failed to generate LLM response", 
                         query=query,
                         error=str(e))
-            raise
+            return f"Sorry, I encountered an error while generating a response: {str(e)}"
     
     def _prepare_context(self, context: List[Dict[str, Any]]) -> str:
         """Prepare context for LLM"""
@@ -109,25 +102,18 @@ Please answer the question based on the context provided above."""
     
     def _get_provider_name(self) -> str:
         """Get the current LLM provider name"""
-        if isinstance(self.llm, ChatGoogleGenerativeAI):
-            return "gemini"
-        else:
-            return "ollama"
+        return self.llm_provider or "none"
     
     async def test_connection(self) -> bool:
         """Test LLM connection"""
         try:
-            test_query = "Hello, this is a test message."
-            
-            if isinstance(self.llm, ChatGoogleGenerativeAI):
-                test_messages: List[BaseMessage] = [HumanMessage(content=test_query)]
-                response = await self.llm.agenerate([test_messages])
-                return bool(response.generations[0][0].text)
+            if not self.llm:
+                return False
                 
-            else:
-                # For Ollama
-                response = await self.llm.agenerate([test_query])
-                return bool(response.generations[0][0].text)
+            test_query = "Hello, this is a test message."
+            test_messages: List[BaseMessage] = [HumanMessage(content=test_query)]
+            response = await self.llm.agenerate([test_messages])
+            return bool(response.generations[0][0].text)
                 
         except Exception as e:
             logger.error("LLM connection test failed", error=str(e))
@@ -136,38 +122,22 @@ Please answer the question based on the context provided above."""
     async def get_model_info(self) -> Dict[str, Any]:
         """Get LLM model information"""
         try:
-            if isinstance(self.llm, ChatGoogleGenerativeAI):
+            if self.llm_provider == "gemini":
                 return {
                     'provider': 'gemini',
                     'model': settings.llm_model,
                     'type': 'chat',
-                    'api_key_configured': bool(settings.gemini_api_key)
+                    'api_key_configured': bool(settings.gemini_api_key),
+                    'status': 'available' if self.llm else 'unavailable'
                 }
-                
             else:
-                # For Ollama, try to get model info
-                try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(f"{settings.ollama_base_url}/api/tags")
-                        if response.status_code == 200:
-                            models = response.json().get('models', [])
-                            current_model = next((m for m in models if m['name'] == settings.llm_model), None)
-                            
-                            return {
-                                'provider': 'ollama',
-                                'model': settings.llm_model,
-                                'type': 'completion',
-                                'model_info': current_model,
-                                'api_key_configured': True  # Ollama doesn't need API key
-                            }
-                except:
-                    pass
-                
                 return {
-                    'provider': 'ollama',
-                    'model': settings.llm_model,
-                    'type': 'completion',
-                    'api_key_configured': True
+                    'provider': 'none',
+                    'model': 'none',
+                    'type': 'none',
+                    'api_key_configured': False,
+                    'status': 'unavailable',
+                    'message': 'No LLM provider configured. Please set GEMINI_API_KEY environment variable.'
                 }
                 
         except Exception as e:
@@ -176,5 +146,7 @@ Please answer the question based on the context provided above."""
                 'provider': 'unknown',
                 'model': 'unknown',
                 'type': 'unknown',
-                'api_key_configured': False
+                'api_key_configured': False,
+                'status': 'error',
+                'error': str(e)
             } 

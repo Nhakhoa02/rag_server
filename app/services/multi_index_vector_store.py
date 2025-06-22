@@ -28,6 +28,15 @@ class MultiIndexVectorStore:
             'default': 'rag_documents'  # Fallback collection
         }
         
+        # Get embedding dimension first
+        def _get_embedding_dim(val):
+            try:
+                return int(val)
+            except Exception:
+                return 384
+        dim = self.embedding_model.get_sentence_embedding_dimension()
+        self.embedding_dim = _get_embedding_dim(dim)
+        
         # Ensure all collections exist (with error handling)
         if not settings.offline_mode:
             try:
@@ -36,14 +45,6 @@ class MultiIndexVectorStore:
                 logger.warning("Failed to connect to Qdrant, collections will be created when needed", error=str(e))
         else:
             logger.info("Running in offline mode - Qdrant initialization skipped")
-        
-        def _get_embedding_dim(val):
-            try:
-                return int(val)
-            except Exception:
-                return 384
-        dim = self.embedding_model.get_sentence_embedding_dimension()
-        self.embedding_dim = _get_embedding_dim(dim)
     
     def _ensure_collections(self):
         """Ensure all collections exist with proper configuration"""
